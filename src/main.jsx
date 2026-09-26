@@ -4,7 +4,8 @@ import { CalendarDays, Check, ChevronDown, Clock3, Moon, Pause, Play, RotateCcw,
 import './styles.css';
 
 const STORAGE_KEY = 'gate-countdown-settings';
-const DEFAULT_DATE = '2027-06-15';
+const DEFAULT_DATE = '2027-02-06';
+const PREVIOUS_DEFAULT_DATE = '2027-06-15';
 const DEFAULT_TIME = '09:00';
 
 const pad = (value) => String(value).padStart(2, '0');
@@ -31,7 +32,9 @@ function App() {
       return {};
     }
   }, []);
-  const [date, setDate] = useState(saved.date || DEFAULT_DATE);
+  const [date, setDate] = useState(
+    saved.date === PREVIOUS_DEFAULT_DATE ? DEFAULT_DATE : saved.date || DEFAULT_DATE
+  );
   const [time, setTime] = useState(saved.time || DEFAULT_TIME);
   const [now, setNow] = useState(Date.now());
   const [darkMode, setDarkMode] = useState(saved.darkMode || false);
