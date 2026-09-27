@@ -7,8 +7,127 @@
     <meta name="description" content="A focused, beautiful countdown for your next big gate." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>GATE//COUNTDOWN — Your next chapter starts soon</title>
+    <style>
+      html { background: #fff8f2; }
+      html[data-theme="dark"] { background: #231d1d; }
+      /* Until the app stylesheet is applied, block transitions so elements
+         cannot animate from their unstyled values once styles arrive. */
+      html[data-booting] *, html[data-booting] *::before, html[data-booting] *::after { transition: none !important; }
+      #gate-boot { position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center; background: #fff8f2; color: #2d2523; transition: opacity .34s cubic-bezier(.2,.75,.25,1), visibility 0s linear .34s; }
+      html[data-theme="dark"] #gate-boot { background: #231d1d; color: #f8e9e0; }
+      #gate-boot.is-leaving { opacity: 0; visibility: hidden; pointer-events: none; }
+      .gate-boot-inner { display: grid; justify-items: center; gap: 14px; opacity: 0; animation: gate-boot-in .42s cubic-bezier(.2,.75,.25,1) .28s forwards; }
+      #gate-boot.is-returning .gate-boot-inner { animation-delay: 0s; }
+      .gate-boot-brand { display: flex; align-items: center; gap: 10px; font: 500 13px/1 ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; letter-spacing: .06em; }
+      .gate-boot-mark { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 8px; background: #f26d4b; color: #fff8f2; font: italic 500 18px/1 'Playfair Display', Georgia, serif; animation: gate-boot-breathe 1.8s ease-in-out .56s infinite; }
+      .gate-boot-slash { color: #f26d4b; }
+      .gate-boot-caption { min-height: 1em; font: 500 10px/1 ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; letter-spacing: .16em; text-transform: uppercase; color: #8c7770; }
+      html[data-theme="dark"] .gate-boot-caption { color: #c2a69b; }
+      @keyframes gate-boot-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+      @keyframes gate-boot-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .62; } }
+      @media (prefers-reduced-motion: reduce) {
+        #gate-boot { transition: none; }
+        .gate-boot-inner { opacity: 1; animation: none; }
+        .gate-boot-mark { animation: none; }
+      }
+    </style>
+    <noscript><style>#gate-boot { display: none; }</style></noscript>
+    <script>
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem('gate-countdown-settings')) || {};
+          var dark = Boolean(saved.darkMode);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', dark ? '#231d1d' : '#fff8f2');
+        } catch (error) {
+          document.documentElement.dataset.theme = 'light';
+        }
+        document.documentElement.setAttribute('data-booting', '');
+      })();
+    </script>
   </head>
   <body>
+    <div id="gate-boot" aria-hidden="true">
+      <div class="gate-boot-inner">
+        <div class="gate-boot-brand"><span class="gate-boot-mark">G</span><span>GATE<span class="gate-boot-slash">//</span>COUNTDOWN</span></div>
+        <div class="gate-boot-caption" id="gate-boot-caption"></div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var boot = document.getElementById('gate-boot');
+        var done = false;
+        var mounted = false;
+
+        try {
+          var returning = /(access_token|refresh_token|[?&]code)=/.test(location.hash + location.search);
+          var restoring = returning;
+          for (var i = 0; !restoring && i < localStorage.length; i += 1) {
+            var key = localStorage.key(i);
+            restoring = !!(key && key.indexOf('sb-') === 0 && /-auth-token$/.test(key));
+          }
+          if (returning && boot) boot.classList.add('is-returning');
+          if (restoring) document.getElementById('gate-boot-caption').textContent = 'Restoring your session';
+        } catch (error) {}
+
+        function reveal() {
+          if (done) return;
+          done = true;
+          root.removeAttribute('data-booting');
+          if (!boot) return;
+          boot.classList.add('is-leaving');
+          setTimeout(function () {
+            if (boot.parentNode) boot.parentNode.removeChild(boot);
+          }, 420);
+        }
+
+        function wait(ms) {
+          return new Promise(function (resolve) { setTimeout(resolve, ms); });
+        }
+
+        function nextFrame() {
+          return new Promise(function (resolve) { requestAnimationFrame(function () { resolve(); }); });
+        }
+
+        function stylesApplied() {
+          return !!getComputedStyle(root).getPropertyValue('--drawer-motion').trim();
+        }
+
+        // Hold the boot surface until the app stylesheet is live, then give
+        // web fonts a short, capped window so text does not swap on reveal.
+        function settle() {
+          var fonts = document.fonts;
+          var deadline = performance.now() + 900;
+          function fontsDefined() {
+            if (!fonts || fonts.size > 0 || performance.now() > deadline) return Promise.resolve();
+            return nextFrame().then(fontsDefined);
+          }
+          (function waitForStyles() {
+            if (done) return;
+            if (!stylesApplied()) return requestAnimationFrame(waitForStyles);
+            fontsDefined()
+              .then(nextFrame)
+              .then(function () {
+                var remaining = Math.max(0, deadline - performance.now());
+                return Promise.race([fonts ? fonts.ready : Promise.resolve(), wait(remaining)]);
+              })
+              .then(nextFrame)
+              .then(nextFrame)
+              .then(reveal, reveal);
+          })();
+        }
+
+        window.__gateAppMounted = function () {
+          if (mounted) return;
+          mounted = true;
+          settle();
+        };
+
+        setTimeout(reveal, 5000);
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

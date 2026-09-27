@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { CalendarDays, Check, ChevronDown, Clock3, Moon, Pause, Play, RotateCcw, Sun, Target } from 'lucide-react';
+import { CalendarDays, Check, Clock3, Pause, Play, RotateCcw, Target } from 'lucide-react';
+import SyllabusTracker from './SyllabusTracker.jsx';
+import ErrorBoundary from './ErrorBoundary.jsx';
+import { Brand, ThemeToggle } from './topbar.jsx';
 import './styles.css';
 
 const STORAGE_KEY = 'gate-countdown-settings';
@@ -60,7 +63,14 @@ function App() {
   }, [date, time, darkMode]);
 
   useEffect(() => {
+    window.__gateAppMounted?.();
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', darkMode ? '#231d1d' : '#fff8f2');
   }, [darkMode]);
 
   const units = [
@@ -93,16 +103,18 @@ function App() {
       <div className="ambient ambient-one" />
       <div className="ambient ambient-two" />
       <nav className="topbar" aria-label="Main navigation">
-        <a className="brand" href="/" aria-label="GATE Countdown home">
-          <span className="brand-mark">G</span>
-          <span>GATE<span className="slash">//</span>COUNTDOWN</span>
-        </a>
-        <div className="nav-actions">
-          <span className="status-pill"><span className="status-dot" /> Personal countdown</span>
-          <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)} aria-label={darkMode ? 'Switch to light theme' : 'Switch to dark theme'}>
-            {darkMode ? <Sun size={17} /> : <Moon size={17} />}
-          </button>
-        </div>
+        <ErrorBoundary
+          fallback={
+            <>
+              <Brand />
+              <div className="nav-actions">
+                <ThemeToggle darkMode={darkMode} onToggle={() => setDarkMode(!darkMode)} />
+              </div>
+            </>
+          }
+        >
+          <SyllabusTracker darkMode={darkMode} onToggleTheme={() => setDarkMode(!darkMode)} />
+        </ErrorBoundary>
       </nav>
 
       <section className="hero">
