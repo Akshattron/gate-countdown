@@ -32,10 +32,10 @@ without making preparation feel overwhelming.**
 
 The interface combines a live timestamp-based countdown with a warm
 peach light theme, a polished dark mode, configurable exam settings,
-preparation progress, and small motivational touches.
+and a personalized, account-synced GATE 2027 CS/IT syllabus tracker.
 
-It is intentionally built as a lightweight client-side application with
-no backend, authentication, or database.
+Countdown and theme preferences remain local to the browser. Syllabus
+completion is stored per authenticated account in Supabase.
 
 ------------------------------------------------------------------------
 
@@ -85,15 +85,15 @@ while keeping the experience calm and focused.
 > examination date as official. The target is configurable and can be
 > updated when the official schedule is available.
 
-### 📈 Preparation Journey
+### 📈 GATE Syllabus Tracker
 
--   Visual preparation progress indicator
--   Adjustable progress percentage
--   Simple journey framing: Preparation → Revision → Final Push → GATE
--   Progress is persisted locally
-
-These labels are product/motivational phases and are **not official GATE
-phases**.
+-   Tracks the supplied 10-section, 134-topic GATE 2027 CS/IT syllabus
+-   Opens as coordinated section and topic drawers
+-   Calculates section and cumulative progress from the centralized
+    syllabus catalog
+-   Saves topic completion to the signed-in user's Supabase account
+-   Uses Google OAuth and database row-level security for account-scoped
+    progress
 
 ### 💭 Motivational Microcopy
 
@@ -116,14 +116,12 @@ without horizontal scrolling.
 -   Reduced-motion support
 -   Accessible settings interface
 
-### ⚡ Lightweight & Client-Side
+### ⚡ Lightweight Frontend with Secure Sync
 
--   No backend
--   No database
--   No authentication
--   No external data service required
--   Browser `localStorage` for user preferences
--   Static deployment friendly
+-   React and Vite frontend with Supabase Auth and Postgres persistence
+-   Browser `localStorage` is limited to countdown and theme preferences
+-   Row-level security policies isolate each user's syllabus progress
+-   No service-role credential is used in the browser
 
 ### 🔎 SEO & Social Metadata
 
@@ -141,10 +139,13 @@ without horizontal scrolling.
 -   **React** --- UI architecture
 -   **Vite** --- development and production tooling
 -   **CSS** --- custom responsive styling and theme system
--   **Web Storage API (`localStorage`)** --- client-side persistence
+-   **Supabase Auth and Postgres** --- Google sign-in and account-scoped
+    topic completion
+-   **Web Storage API (`localStorage`)** --- countdown and theme
+    preferences only
 
-The project deliberately avoids a heavy dependency stack because the
-product does not need a backend or complex application infrastructure.
+The frontend stays lightweight while Supabase handles identity and
+secure progress persistence.
 
 ------------------------------------------------------------------------
 
@@ -155,8 +156,18 @@ gate-countdown/
 ├── public/
 │   └── favicon.svg
 ├── src/
+│   ├── ErrorBoundary.jsx
+│   ├── SyllabusTracker.jsx
 │   ├── main.jsx
-│   └── styles.css
+│   ├── supabase.js
+│   ├── syllabus.js
+│   ├── syllabus.test.js
+│   ├── styles.css
+│   └── topbar.jsx
+├── supabase/
+│   └── migrations/
+│       └── 20260927000000_create_topic_completions.sql
+├── .env.example
 ├── index.html
 ├── package.json
 ├── vercel.json
@@ -173,20 +184,43 @@ gate-countdown/
 Make sure you have a current version of **Node.js** and **npm**
 installed.
 
-### 1. Clone the repository
+### 1. Configure Supabase
+
+Create a Supabase project, enable Google under **Authentication →
+Providers** with the Google OAuth client credentials, and add Supabase's
+callback URL (`https://<project-ref>.supabase.co/auth/v1/callback`) to
+the allowed redirect URIs in Google Cloud. Configure the site's local
+and deployed URLs under **Authentication → URL Configuration**. Apply the migration in
+`supabase/migrations/20260927000000_create_topic_completions.sql` using
+the Supabase SQL editor or Supabase CLI. The migration enables RLS and
+allows authenticated users to access only their own completion rows.
+
+Create a local `.env` file from `.env.example` and set the public project
+URL and anon/publishable key:
+
+``` text
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+These frontend values are public by design; database access is protected
+by Supabase Auth and RLS. Never put a Supabase service-role key in a
+`VITE_` variable or commit real credentials.
+
+### 2. Clone the repository
 
 ``` bash
 git clone https://github.com/Akshattron/gate-countdown.git
 cd gate-countdown
 ```
 
-### 2. Install dependencies
+### 3. Install dependencies
 
 ``` bash
 npm install
 ```
 
-### 3. Start the development server
+### 4. Start the development server
 
 ``` bash
 npm run dev
@@ -217,7 +251,8 @@ preview command configured by the project.
 
 ## ☁️ Deployment
 
-GATE//COUNTDOWN is designed for static hosting.
+GATE//COUNTDOWN is designed for static hosting with Supabase providing
+authentication and database access.
 
 ### Vercel
 
@@ -232,7 +267,9 @@ Output Directory: dist
 Root Directory: ./
 ```
 
-No environment variables are required.
+Configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the hosting
+provider before building. Add the deployed site's URL to Supabase's
+authentication redirect allow list.
 
 The application can also be deployed to other static hosts that support
 Vite's production output.
@@ -241,26 +278,23 @@ Vite's production output.
 
 ## 🔐 Data & Privacy
 
-GATE//COUNTDOWN is intentionally client-side.
+Countdown date/time and theme settings are kept in browser `localStorage`.
+Syllabus progress is stored in Supabase and associated with the signed-in
+user.
 
 User-configurable preferences such as:
 
 -   examination date
 -   examination time
--   preparation progress
 -   theme preference
 
 are stored locally in the browser using `localStorage`.
 
-There is:
-
--   no user account
--   no backend
--   no database
--   no required personal-data submission
--   no required analytics service
-
-Clearing the site's browser storage resets locally saved preferences.
+Clearing browser storage resets those preferences but does not delete
+account progress. Topic completion is read and written through
+authenticated Supabase requests protected by row-level security. Signing
+out clears progress from the active interface; another account receives
+only its own rows.
 
 ------------------------------------------------------------------------
 
@@ -296,16 +330,25 @@ countdown feel **important, calm, and memorable**.
 
 ## 🧪 Validation
 
-The implementation was validated with:
+Run the catalog and progress unit tests and production build with:
 
 ``` text
-npm install
+npm test
 npm run build
-git diff --check
-local Vite server HTTP 200 verification
 ```
 
-The production build completed successfully during development.
+Because the project uses esbuild's classic JSX transform, every `.jsx`
+file must `import React from 'react'`. A missing import builds cleanly
+but fails at runtime, so always load the app in a browser after adding a
+component.
+
+The syllabus tracker is wrapped in an error boundary, and the Supabase
+client is created defensively. If Supabase environment variables are
+absent or the client cannot be created, the countdown still renders and
+the tracker shows a "Setup needed" state instead of a blank page.
+
+OAuth and database flows require a configured Supabase project and Google
+provider credentials.
 
 ------------------------------------------------------------------------
 
@@ -317,15 +360,12 @@ future additions include:
 -   Pomodoro study sessions
 -   Study streaks
 -   Daily study goals
--   Subject-wise progress
--   GATE syllabus checklist
 -   Revision tracking
 -   Previous-year-question (PYQ) tracking
 -   Mock-test tracking
 -   Performance analytics
 -   PWA/offline support
 -   Installable mobile experience
--   Optional cloud synchronization
 -   Notification support
 
 These are **future ideas, not currently implemented features**.
